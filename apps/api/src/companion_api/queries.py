@@ -19,6 +19,7 @@ from companion_db.models import (
     EmsStrategyInterval,
     EnergySample,
     ExternalInput,
+    MqttMessage,
     SemComparison,
     SystemHealth,
     TelemetrySample,
