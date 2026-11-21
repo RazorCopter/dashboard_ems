@@ -10,6 +10,7 @@ import {
 import { EChart } from "../EChart";
 import { HelpTip } from "../HelpTip";
 import { EmeraldDetailDrawer, EmeraldPageHeader, EmeraldStatusPill } from "./EmeraldChrome";
+import { espModeLabel } from "./espModeLabel";
 import { EmeraldDecisionCard } from "./EmeraldDecisionCard";
 import { EmeraldEnergyMonitor } from "./EmeraldEnergyMonitor";
 import { EmeraldKpiSection } from "./EmeraldKpiSection";
@@ -52,7 +53,7 @@ export function EmeraldDashboardLayout({ vm, chartRange, onChangeChartRange }: P
       {/* TALL CONTEXTUAL EMERALD HEADER */}
       <EmeraldPageHeader
         title="Dashboard Live"
-        subtitle="Monitoraggio energetico in tempo reale · Analisi autonoma in SHADOW"
+        subtitle="Flussi energetici e regolazione dell’impianto"
         badges={
           <>
             <span className="em-header-clock mono">
@@ -63,7 +64,7 @@ export function EmeraldDashboardLayout({ vm, chartRange, onChangeChartRange }: P
             </span>
             <EmeraldStatusPill tone={vm.telStateClass} label={telStateLabel} />
             <EmeraldStatusPill tone="info" label={vm.decision.effectiveStrategyLabel} />
-            <EmeraldStatusPill tone="shadow" label="Modalità SHADOW" />
+            <EmeraldStatusPill tone="info" label={espModeLabel(vm.system.components.aux1)} />
           </>
         }
         actions={
@@ -87,44 +88,9 @@ export function EmeraldDashboardLayout({ vm, chartRange, onChangeChartRange }: P
           safetyMaxW={vm.decision.safetyMaxW}
           selfConsumptionPct={vm.kpis.selfConsumptionPct}
         />
-        <EmeraldDecisionCard decision={vm.decision} />
+        <EmeraldDecisionCard decision={vm.decision} batteryW={tel?.stale ? null : tel?.battery_w} gridW={tel?.stale ? null : tel?.grid_w} />
       </section>
 
-      {/* ROW 2 (3 HERO PANELS) & ROW 3 (4 CONTINUOUS SPARKLINE CARDS) */}
-      <EmeraldKpiSection
-        kpis={vm.kpis}
-        battPowerW={tel?.battery_w}
-        formulas={vm.raw.kpi_today?.formulas}
-      />
-
-      {/* SLEEK COVERAGE & DATA QUALITY RIBBON */}
-      <section className="em-coverage-ribbon" aria-label="Copertura e qualità acquisizione dati">
-        <div className="em-cov-left">
-          <EmeraldStatusPill
-            tone={cov.pct != null && cov.pct >= 95 ? "ok" : cov.pct == null ? "neutral" : "warn"}
-            label={`Copertura: ${cov.pct != null ? fmtPct(cov.pct) : "N/D"}`}
-          />
-          <span className="label-with-tip em-cov-note">
-            {formatStartedAtLabel(cov.firstSampleAt, cov.monitoringStartedToday, vm.timezone)}
-            <HelpTip
-              id="tip-em-coverage"
-              title="Copertura telemetrica"
-              text="Percentuale di secondi con dati validi dal primo avvio del Companion."
-              align="left"
-            />
-          </span>
-        </div>
-        <div className="em-cov-pills">
-          {cov.monitoringStartedToday && (
-            <span className="em-cov-chip">Pre-avvio escluso ({fmtDurationCompact(cov.unmonitoredPreInstallSec)})</span>
-          )}
-          <span className="em-cov-chip">Gap: {fmtDurationCompact(cov.gapSeconds)}</span>
-          <span className="em-cov-chip">Invalidi: {cov.invalidSamples}</span>
-          {cov.unavailableSeconds > 0 && (
-            <span className="em-cov-chip em-cov-chip-err">Unavailable: {fmtDurationCompact(cov.unavailableSeconds)}</span>
-          )}
-        </div>
-      </section>
 
       {/* ROW 4: 75% WIDE LIVE CHART + 25% AUTONOMOUS STATO IMPIANTO PANEL */}
       <section className="em-row-bottom">
@@ -165,6 +131,43 @@ export function EmeraldDashboardLayout({ vm, chartRange, onChangeChartRange }: P
 
         <div className="em-system-desktop-slot">
           <EmeraldSystemPanel system={vm.system} variant="panel" />
+        </div>
+      </section>
+
+      <h2 className="em-card-title">Energia di oggi</h2>
+      {/* ROW 2 (3 HERO PANELS) & ROW 3 (4 CONTINUOUS SPARKLINE CARDS) */}
+      <EmeraldKpiSection
+        kpis={vm.kpis}
+        battPowerW={tel?.battery_w}
+        formulas={vm.raw.kpi_today?.formulas}
+      />
+
+      {/* SLEEK COVERAGE & DATA QUALITY RIBBON */}
+      <section className="em-coverage-ribbon" aria-label="Copertura e qualità acquisizione dati">
+        <div className="em-cov-left">
+          <EmeraldStatusPill
+            tone={cov.pct != null && cov.pct >= 95 ? "ok" : cov.pct == null ? "neutral" : "warn"}
+            label={`Copertura: ${cov.pct != null ? fmtPct(cov.pct) : "N/D"}`}
+          />
+          <span className="label-with-tip em-cov-note">
+            {formatStartedAtLabel(cov.firstSampleAt, cov.monitoringStartedToday, vm.timezone)}
+            <HelpTip
+              id="tip-em-coverage"
+              title="Copertura telemetrica"
+              text="Percentuale di secondi con dati validi dal primo avvio del Companion."
+              align="left"
+            />
+          </span>
+        </div>
+        <div className="em-cov-pills">
+          {cov.monitoringStartedToday && (
+            <span className="em-cov-chip">Pre-avvio escluso ({fmtDurationCompact(cov.unmonitoredPreInstallSec)})</span>
+          )}
+          <span className="em-cov-chip">Gap: {fmtDurationCompact(cov.gapSeconds)}</span>
+          <span className="em-cov-chip">Invalidi: {cov.invalidSamples}</span>
+          {cov.unavailableSeconds > 0 && (
+            <span className="em-cov-chip em-cov-chip-err">Unavailable: {fmtDurationCompact(cov.unavailableSeconds)}</span>
+          )}
         </div>
       </section>
 
