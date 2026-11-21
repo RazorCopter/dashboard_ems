@@ -70,6 +70,7 @@ async def mqtt_loop(settings: CollectorSettings, engine: IngestionEngine) -> Non
         (f"{base}/input/#", 1),
         (f"{base}/forecast/solar", 1),
         (f"{sem}/#", 1),
+        ("zigbee2mqtt/POW-Generale", 0),
     ]
 
     backoff = 2.0
