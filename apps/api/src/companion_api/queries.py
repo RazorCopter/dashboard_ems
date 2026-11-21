@@ -290,8 +290,8 @@ async def get_system_status(session: AsyncSession, device_id: str) -> dict[str, 
     ).scalars().all()
     by_comp = {r.component: {"status": r.status, "recorded_at": r.recorded_at.isoformat(), "detail": r.detail_json} for r in rows}
 
-    # Ensure all 8 expected components are always represented without fabricating online status
-    expected = ["esp32", "mqtt", "home_assistant", "modbus", "ntp", "collector", "database", "aux1"]
+    # Include expected components even before their first status arrives.
+    expected = ["esp32", "esp32_sync", "mqtt", "home_assistant", "modbus", "ntp", "collector", "database", "aux1"]
     components: dict[str, Any] = {}
     for comp in expected:
         if comp in by_comp:
