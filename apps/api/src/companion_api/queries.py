@@ -613,13 +613,15 @@ async def query_coverage_summary(
 
 
 HOUSE_METER_TOPIC = "zigbee2mqtt/POW-Generale"
+OUTLETS_METER_TOPIC = "zigbee2mqtt/POW-Prese"
 HOUSE_METER_MAX_AGE_S = 15
 
 
-async def house_meter_samples(session: AsyncSession, start: datetime, end: datetime) -> list[tuple[datetime, float]]:
+async def house_meter_samples(session: AsyncSession, start: datetime, end: datetime, *, topic: str = HOUSE_METER_TOPIC
+) -> list[tuple[datetime, float]]:
     rows = (await session.execute(
         select(MqttMessage.received_at, MqttMessage.payload_json)
-        .where(MqttMessage.topic == HOUSE_METER_TOPIC, MqttMessage.retain.is_(False),
+        .where(MqttMessage.topic == topic, MqttMessage.retain.is_(False),
                MqttMessage.schema_valid.is_(True), MqttMessage.received_at >= start, MqttMessage.received_at <= end)
         .order_by(MqttMessage.received_at, MqttMessage.id)
     )).all()
@@ -636,6 +638,10 @@ async def power_balance_hour(session: AsyncSession, device_id: str) -> list[dict
     start = end - timedelta(hours=1)
     meter = await house_meter_samples(session, start - timedelta(seconds=HOUSE_METER_MAX_AGE_S), end)
     meter_times = [stamp for stamp, _ in meter]
+    outlets = await house_meter_samples(
+        session, start - timedelta(seconds=HOUSE_METER_MAX_AGE_S), end, topic=OUTLETS_METER_TOPIC
+    )
+    outlet_times = [stamp for stamp, _ in outlets]
     telemetry = (await session.execute(
         select(TelemetrySample)
         .where(TelemetrySample.device_id == device_id, TelemetrySample.source_timestamp.between(start, end))
@@ -646,6 +652,12 @@ async def power_balance_hour(session: AsyncSession, device_id: str) -> list[dict
         i = bisect_right(meter_times, t.source_timestamp) - 1
         age = (t.source_timestamp - meter_times[i]).total_seconds() if i >= 0 else None
         measured = meter[i][1] if t.time_valid and age is not None and age <= HOUSE_METER_MAX_AGE_S else None
+        j = bisect_right(outlet_times, t.source_timestamp) - 1
+        outlets_age = (t.source_timestamp - outlet_times[j]).total_seconds() if j >= 0 else None
+        outlets_w = (
+            outlets[j][1] if t.time_valid and outlets_age is not None and outlets_age <= HOUSE_METER_MAX_AGE_S
+            else None
+        )
         valid = t.telemetry_valid
         rows.append({
             "sample_utc": t.source_timestamp.isoformat(),
@@ -653,6 +665,10 @@ async def power_balance_hour(session: AsyncSession, device_id: str) -> list[dict
             "tongou_age_s": round(age, 3) if measured is not None else None,
             "house_source": "tongou" if measured is not None else "afore_derived" if valid and t.load_w is not None else None,
             "house_measured_w": measured,
+            "outlets_received_utc": outlet_times[j].isoformat() if outlets_w is not None else None,
+            "outlets_age_s": round(outlets_age, 3) if outlets_w is not None else None,
+            "outlets_measured_w": outlets_w,
+            "house_minus_outlets_w": measured - outlets_w if measured is not None and outlets_w is not None else None,
             "house_derived_w": t.load_w,
             "house_delta_w": measured - t.load_w if valid and measured is not None and t.load_w is not None else None,
             "pv_w": t.pv_w, "inverter_w": t.inverter_w, "grid_w": t.grid_w, "battery_w": t.battery_w,

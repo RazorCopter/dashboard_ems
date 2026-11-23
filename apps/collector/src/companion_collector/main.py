@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from energy_domain import SecretRedactingFilter, SemComparisonThresholds
 from .config import CollectorSettings
 from .ingestor import IngestionEngine
+from .esp_logs import esp_log_loop
 from .rest_client import Esp32ReadOnlyClient
 
 logging.basicConfig(
@@ -71,6 +72,7 @@ async def mqtt_loop(settings: CollectorSettings, engine: IngestionEngine) -> Non
         (f"{base}/forecast/solar", 1),
         (f"{sem}/#", 1),
         ("zigbee2mqtt/POW-Generale", 0),
+        ("zigbee2mqtt/POW-Prese", 0),
     ]
 
     backoff = 2.0
@@ -215,12 +217,14 @@ async def main() -> None:
             logger.info("Waiting for database (%d/15): %s", attempt, exc)
             await asyncio.sleep(2.0)
 
+    tasks = [mqtt_loop(settings, engine), esp32_rest_loop(settings, engine)]
+    if settings.esp32_enabled and settings.esp32_password:
+        log_client = Esp32ReadOnlyClient(settings.esp32_url, settings.esp32_username, settings.esp32_password)
+        tasks.append(esp_log_loop(log_client))
+
     runner = await run_health_server(settings, engine)
     try:
-        await asyncio.gather(
-            mqtt_loop(settings, engine),
-            esp32_rest_loop(settings, engine),
-        )
+        await asyncio.gather(*tasks)
     finally:
         await runner.cleanup()
         await db_engine.dispose()
